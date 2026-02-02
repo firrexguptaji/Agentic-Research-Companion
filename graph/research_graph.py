@@ -11,74 +11,100 @@ from agents.idea_generator_agent import idea_generator_agent
 
 
 # -----------------------------
-# Shared State Definition
+# Shared State
 # -----------------------------
-
-
 class ResearchState(TypedDict):
     query: str
     selected_agents: List[str]
     intermediate_results: Dict
     final_response: str
 
-# ----------------------------
+
+# -----------------------------
 # Planner Node
-# ----------------------------
+# -----------------------------
 def planner_node(state: ResearchState) -> ResearchState:
-    selected = planner_agent(state["query"])
-    state["selected_agents"] = selected
+    state["selected_agents"] = planner_agent(state["query"])
     return state
 
 
-# ----------------------------
-# Agent Router
-# ----------------------------
-
-def agent_router(state: ResearchState) -> str:
-    """
-    Decides which agent to call next based on
-    remaining selected agents.
-    """
+# -----------------------------
+# Router
+# -----------------------------
+def router(state: ResearchState) -> str:
     if not state["selected_agents"]:
         return "final"
-    
-    return state["selected_agents"].pop(0)
 
-# ----------------------------
+    raw_agent = state["selected_agents"].pop(0)
+
+    if raw_agent not in PLANNER_TO_GRAPH_NODE:
+        raise ValueError(
+            f"Planner returned unknown agent '{raw_agent}'. "
+            f"Known agents: {list(PLANNER_TO_GRAPH_NODE.keys())}"
+        )
+
+    return PLANNER_TO_GRAPH_NODE[raw_agent]
+
+
+# -----------------------------
 # Final Aggregator
-# ----------------------------
-
+# -----------------------------
 def final_node(state: ResearchState) -> ResearchState:
-    summaries = []
-    
-    for agent, result in state["intermediate_results"].items():
-        summaries.append(f"[{agent.upper()}]\n{result}")
-    
-    state["final_response"] = "\n\n".join(summaries)
-    return state
+    output = []
 
-# ----------------------------
+    for agent, content in state["intermediate_results"].items():
+        output.append(f"[{agent.upper()}]\n{content}")
+
+    state["final_response"] = "\n\n".join(output)
+    return state
+# -----------------------------
+# Planner → Graph Node Mapping
+# -----------------------------
+PLANNER_TO_GRAPH_NODE = {
+    # direct
+    "paper_reader": "paper_reader",
+    "idea_generator": "idea_generator",
+
+    # math
+    "math_explainer_agent": "math_explainer",
+    "math_explainer": "math_explainer",
+
+    # comparison
+    "comparison_agent": "comparison",
+    "comparison": "comparison",
+
+    # critique
+    "critique_agent": "critique",
+    "critique": "critique",
+
+    # final
+    "final": "final",
+}
+
+# -----------------------------
 # Build Graph
-# ----------------------------
+# -----------------------------
 def build_graph():
     graph = StateGraph(ResearchState)
+
+    # Nodes
+    graph.add_node("planner", planner_node)
+    graph.add_node("paper_reader", paper_reader_agent)
+    graph.add_node("math_explainer", math_explainer_agent)
+    graph.add_node("comparison", comparison_agent)
+    graph.add_node("critique", critique_agent)
+    graph.add_node("idea_generator", idea_generator_agent)
+    graph.add_node("final", final_node)
     
-    # Node
-    graph.add_node("plainer",planner_node)
-    graph.add_node("paper_reader",paper_reader_agent)
-    graph.add_node("math_explainer",math_explainer_agent)
-    graph.add_node("comparison",comparison_agent)
-    graph.add_node("critique",critique_agent)
-    graph.add_node("idea_generator",idea_generator_agent)
-    graph.add_node("final",final_node)
     
-    
-    # Edges
+
+    # Entry
     graph.set_entry_point("planner")
-    
+
+    # Planner routes once
     graph.add_conditional_edges(
-        "plainer",
-        agent_router,
+        "planner",
+        router,
         {
             "paper_reader": "paper_reader",
             "math_explainer": "math_explainer",
@@ -88,7 +114,8 @@ def build_graph():
             "final": "final",
         },
     )
-    
+
+    # Agents route to next agent or final
     for agent in [
         "paper_reader",
         "math_explainer",
@@ -98,7 +125,7 @@ def build_graph():
     ]:
         graph.add_conditional_edges(
             agent,
-            agent_router,
+            router,
             {
                 "paper_reader": "paper_reader",
                 "math_explainer": "math_explainer",
@@ -108,7 +135,7 @@ def build_graph():
                 "final": "final",
             },
         )
-    
-    graph.add_edge("final",END)
-    
+
+    graph.add_edge("final", END)
+
     return graph.compile()

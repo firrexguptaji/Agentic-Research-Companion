@@ -26,7 +26,7 @@ def planner_agent(query: str) -> List[str]:
         "objective","proof"
     }
     if any(k in query_lower for k in math_keyword):
-        selected_agents.append("math_solver")
+        selected_agents.append("math_explainer_agent")
         
     #Comparison
     comparison_keyword = {

@@ -2,7 +2,7 @@ def math_explainer_agent(state: dict) -> dict:
     """
     Math Explainer Agent (Stage 1)
     -----------------------------
-    Simulates explaination of mathematical content
+    Simulates explanation of mathematical content
     (equations, loss functions, objectives).
     
     
@@ -16,12 +16,12 @@ def math_explainer_agent(state: dict) -> dict:
         state: shared LangGraph state
     
     Output:
-        Updated state with math explaination placeholder
+        Updated state with math explanation placeholder
     """
     
     query = state.get("query", "")
     
-    explaination = (
+    explanation = (
         "Math Explainer Agent:"
         "This agent would analyze equations, loss functions,"
         "and mathematical derivations from the paper and "
@@ -30,7 +30,7 @@ def math_explainer_agent(state: dict) -> dict:
     
     state["intermediate_results"]["math_explainer"] = {
         "query": query,
-        "explaination": explaination
+        "explanation": explanation
     }
     
     return state
