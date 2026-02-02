@@ -1,5 +1,47 @@
-# Project specific
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# =========================
+# Virtual Environment
+# =========================
 venv/
+.env
+
+# =========================
+# OS / Editor noise
+# =========================
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Build / Distribution
+# =========================
+build/
+dist/
+*.egg-info/
+
+# =========================
+# Future stages (safe to ignore now)
+# =========================
 data/
 vector_db/
 uploads/
+
+# =========================
+# Streamlit / FastAPI cache (future)
+# =========================
+.streamlit/
+.cache/
