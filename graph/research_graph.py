@@ -17,10 +17,10 @@ class ResearchState(TypedDict):
     query: str
     paper_path: str | None
     paper_text: str
+    paper_sections: Dict[str, str]
     selected_agents: List[str]
     intermediate_results: Dict
     final_response: str
-
 
 # -----------------------------
 # Planner Node
