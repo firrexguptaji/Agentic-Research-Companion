@@ -45,14 +45,15 @@ def paper_reader_agent(state: dict) -> dict:
         state["intermediate_results"]["paper_reader"]
     """
     paper_path = state.get("paper_path")
+    print("DEBUG paper_path:", paper_path)
     if paper_path:
         paper_text = parse_pdf(paper_path)
         summary = "PDF parsed successfully. Raw text extracted."
     else:
         paper_text = ""
         summary = (
-            "No PDF provided",
-            "Paper Reader Agent expects 'paper_path' in state. "
+            "No PDF provided. "
+            "Paper Reader Agent expects 'paper_path' in state."
         )
     
     state["paper_text"] = paper_text

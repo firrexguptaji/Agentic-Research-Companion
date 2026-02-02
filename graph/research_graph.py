@@ -15,6 +15,8 @@ from agents.idea_generator_agent import idea_generator_agent
 # -----------------------------
 class ResearchState(TypedDict):
     query: str
+    paper_path: str | None
+    paper_text: str
     selected_agents: List[str]
     intermediate_results: Dict
     final_response: str
