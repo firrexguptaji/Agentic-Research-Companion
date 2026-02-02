@@ -14,7 +14,20 @@ class PaperVectorStore:
             name=collection_name
         )
         self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
+        
 
+    def chunk_text(text: str, chunk_size: 500, overlap: 100):
+        chunks = []
+        start = 0
+        length = len(text)
+
+        while start < length:
+            end = start + chunk_size
+            chunks.append(text[start:end])
+            start = end - overlap
+
+        return chunks
+    
     def add_sections(self, sections: Dict[str, str]):
         """
         Add paper sections to the vector store.
@@ -27,9 +40,12 @@ class PaperVectorStore:
             if not text.strip():
                 continue
 
-            documents.append(text)
-            metadatas.append({"section": section})
-            ids.append(f"{section}_{idx}")
+            chunks = chunk_text(text)
+
+            for i, chunk in enumerate(chunks):
+                documents.append(chunk)
+                metadatas.append({"section": section})
+                ids.append(f"{section}_{idx}_{i}")
 
         if not documents:
             return

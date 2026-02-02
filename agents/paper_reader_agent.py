@@ -59,6 +59,7 @@ def paper_reader_agent(state: dict) -> dict:
         summary = f"PDF parsing failed: {str(e)}"
 
     state["paper_text"] = paper_text
+    
     state["paper_sections"] = sections
     state["intermediate_results"]["paper_reader"] = {
         "summary": summary,
