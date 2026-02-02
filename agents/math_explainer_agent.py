@@ -1,5 +1,6 @@
 import re
-from typing import Dict
+from typing import Dict, List
+from tools.vector_store import PaperVectorStore
 
 
 LOSS_PATTERNS = [
@@ -38,15 +39,28 @@ def extract_math_snippets(text: str, window: int = 400) -> Dict[str, str]:
 
 
 def math_explainer_agent(state: dict) -> dict:
+    # """
+    # Math Explainer Agent (Stage 2)
+    # -----------------------------
+    # Uses real paper text to identify and explain loss functions / equations.
+    # """
     """
-    Math Explainer Agent (Stage 2)
-    -----------------------------
-    Uses real paper text to identify and explain loss functions / equations.
+    Math Explainer Agent (Stage 3.1)
+    --------------------------------
+    Uses VectorDB to retrieve semantically relevant sections
+    related to loss/objective functions and explains them.
     """
-
+    
     paper_text = state.get("paper_text", "")
     query = state.get("query", "")
+    
+    vector_store = PaperVectorStore()
 
+    retrieved_chunks: List[Dict] = vector_store.query(
+        query="loss function objective training optimization",
+        top_k=3,
+    )
+    
     if not paper_text.strip():
         explanation = (
             "No paper text available. "

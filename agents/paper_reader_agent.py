@@ -1,5 +1,5 @@
 from tools.pdf_parser import parse_pdf_with_sections
-
+from tools.vector_store import PaperVectorStore
 
 def paper_reader_agent(state: dict) -> dict:
     # """
@@ -44,6 +44,8 @@ def paper_reader_agent(state: dict) -> dict:
     try:
         if paper_path:
             sections = parse_pdf_with_sections(paper_path)
+            vector_store = PaperVectorStore()
+            vector_store.add_sections(sections)
             paper_text = "\n\n".join(sections.values())
             summary = "PDF parsed successfully with section-aware extraction."
         else:

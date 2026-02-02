@@ -4,3 +4,5 @@ pydantic>=2.0
 python-dotenv>=1.0
 rich>=13.0
 pymupdf>=1.22.5
+chromadb>=0.3.21
+sentence-transformers>=2.2.0

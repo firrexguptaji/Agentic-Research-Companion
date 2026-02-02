@@ -1,50 +1,44 @@
-import fitz  # PyMuPDF
+import fitz
 import os
 import re
 from typing import Dict
 
 
 SECTION_HEADERS = {
-    "abstract": r"\babstract\b",
-    "introduction": r"\bintroduction\b",
-    "method": r"\b(method|approach|methodology)\b",
-    "experiments": r"\b(experiment|evaluation|results)\b",
-    "discussion": r"\b(discussion|analysis)\b",
-    "conclusion": r"\b(conclusion|future work)\b",
+    "abstract": r"(?:^|\n)\s*(abstract)\s*\n",
+    "introduction": r"(?:^|\n)\s*(\d+\.?\s*)?introduction\s*\n",
+    "method": r"(?:^|\n)\s*(\d+\.?\s*)?(method|approach|methodology)\s*\n",
+    "experiments": r"(?:^|\n)\s*(\d+\.?\s*)?(experiment|evaluation|results)\s*\n",
+    "discussion": r"(?:^|\n)\s*(\d+\.?\s*)?(discussion|analysis)\s*\n",
+    "conclusion": r"(?:^|\n)\s*(\d+\.?\s*)?(conclusion|future work)\s*\n",
 }
 
 
 def parse_pdf_with_sections(file_path: str) -> Dict[str, str]:
-    """
-    Extract text from a PDF and split it into coarse sections.
-    """
     if not os.path.exists(file_path):
-        raise FileNotFoundError(
-            f"PDF file not found at path: {os.path.abspath(file_path)}"
-        )
+        raise FileNotFoundError(f"PDF not found: {file_path}")
 
     doc = fitz.open(file_path)
     full_text = "\n".join(page.get_text() for page in doc)
     doc.close()
 
-    lower = full_text.lower()
+    text = full_text.lower()
+    matches = []
+
+    for section, pattern in SECTION_HEADERS.items():
+        for m in re.finditer(pattern, text, flags=re.IGNORECASE):
+            matches.append((m.start(), section))
+
+    # Sort by appearance
+    matches.sort(key=lambda x: x[0])
+
     sections: Dict[str, str] = {}
-    indices = []
 
-    for name, pattern in SECTION_HEADERS.items():
-        match = re.search(pattern, lower)
-        if match:
-            indices.append((match.start(), name))
+    for i, (start, name) in enumerate(matches):
+        end = matches[i + 1][0] if i + 1 < len(matches) else len(full_text)
+        sections[name] = full_text[start:end].strip()
 
-    # Sort sections by appearance
-    indices.sort(key=lambda x: x[0])
-
-    for i, (start_idx, name) in enumerate(indices):
-        end_idx = indices[i + 1][0] if i + 1 < len(indices) else len(full_text)
-        sections[name] = full_text[start_idx:end_idx].strip()
-
-    # Fallback if nothing matched
-    if not sections:
-        sections["full_text"] = full_text
+    # 🔒 Always keep full text
+    sections["full_text"] = full_text
 
     return sections
