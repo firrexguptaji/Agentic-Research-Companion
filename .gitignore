@@ -1,0 +1,5 @@
+# Project specific
+venv/
+data/
+vector_db/
+uploads/
