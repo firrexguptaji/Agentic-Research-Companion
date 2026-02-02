@@ -97,4 +97,3 @@ agentic-research-companion/
 ├── run.py
 ├── requirements.txt
 └── README.md
-## ▶️ How to Run
