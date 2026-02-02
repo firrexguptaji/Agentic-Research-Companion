@@ -1,85 +1,102 @@
-from typing import Dict, List
 from sentence_transformers import SentenceTransformer
-import chromadb
+from typing import List, Dict
+import numpy as np
+import os
 
 
 class PaperVectorStore:
     """
-    Lightweight VectorDB wrapper for paper sections.
+    Lightweight in-memory Vector DB for research papers.
     """
 
-    def __init__(self, collection_name: str = "paper_sections"):
-        self.client = chromadb.Client()
-        self.collection = self.client.get_or_create_collection(
-            name=collection_name
-        )
-        self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
-        
+    def __init__(
+        self,
+        model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+        normalize: bool = True,
+    ):
+        self.embedder = SentenceTransformer(model_name)
+        self.normalize = normalize
 
-    def chunk_text(text: str, chunk_size: 500, overlap: 100):
-        chunks = []
-        start = 0
-        length = len(text)
+        self.embeddings: List[np.ndarray] = []
+        self.text_chunks: List[Dict] = []
 
-        while start < length:
-            end = start + chunk_size
-            chunks.append(text[start:end])
-            start = end - overlap
-
-        return chunks
-    
-    def add_sections(self, sections: Dict[str, str]):
-        """
-        Add paper sections to the vector store.
-        """
-        documents = []
-        metadatas = []
-        ids = []
-
-        for idx, (section, text) in enumerate(sections.items()):
-            if not text.strip():
-                continue
-
-            chunks = chunk_text(text)
-
-            for i, chunk in enumerate(chunks):
-                documents.append(chunk)
-                metadatas.append({"section": section})
-                ids.append(f"{section}_{idx}_{i}")
-
-        if not documents:
+    # -------------------------
+    # Indexing
+    # -------------------------
+    def add_documents(
+        self,
+        chunks: List[str],
+        metadatas: List[Dict],
+    ):
+        if not chunks:
             return
 
-        embeddings = self.embedder.encode(documents).tolist()
-
-        self.collection.add(
-            documents=documents,
-            embeddings=embeddings,
-            metadatas=metadatas,
-            ids=ids,
+        vectors = self.embedder.encode(
+            chunks,
+            convert_to_numpy=True,
+            show_progress_bar=False,
         )
 
-    def query(self, query: str, top_k: int = 3) -> List[Dict]:
-        """
-        Query the vector store for relevant sections.
-        """
-        embedding = self.embedder.encode(query).tolist()
+        if self.normalize:
+            vectors = self._normalize(vectors)
 
-        results = self.collection.query(
-            query_embeddings=[embedding],
-            n_results=top_k,
-        )
-
-        matches = []
-        for doc, meta in zip(
-            results["documents"][0],
-            results["metadatas"][0],
-        ):
-            matches.append(
+        for vec, text, meta in zip(vectors, chunks, metadatas):
+            self.embeddings.append(vec)
+            self.text_chunks.append(
                 {
-                    "section": meta["section"],
-                    "content": doc[:500],  # truncate for safety
+                    "text": text,
+                    "metadata": meta,
                 }
             )
 
-        return matches
+    # -------------------------
+    # Search
+    # -------------------------
+    def similarity_search(
+        self,
+        query: str,
+        top_k: int = 3,
+        section_filter: str | None = None,
+    ) -> List[Dict]:
+        if not self.embeddings:
+            return []
+
+        query_vec = self.embedder.encode(
+            query,
+            convert_to_numpy=True,
+        )
+
+        if self.normalize:
+            query_vec = query_vec / np.linalg.norm(query_vec)
+
+        scores = np.dot(self.embeddings, query_vec)
+
+        ranked_indices = np.argsort(scores)[::-1]
+
+        results = []
+        for idx in ranked_indices:
+            item = self.text_chunks[idx]
+
+            if section_filter:
+                if item["metadata"].get("section") != section_filter:
+                    continue
+
+            results.append(
+                {
+                    "score": float(scores[idx]),
+                    "text": item["text"],
+                    "metadata": item["metadata"],
+                }
+            )
+
+            if len(results) >= top_k:
+                break
+
+        return results
+
+    # -------------------------
+    # Utils
+    # -------------------------
+    def _normalize(self, vectors: np.ndarray) -> np.ndarray:
+        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+        return vectors / (norms + 1e-10)
