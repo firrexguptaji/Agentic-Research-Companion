@@ -1,4 +1,5 @@
 from typing import Dict, List
+from tools import vector_store
 from tools.vector_store import PaperVectorStore
 
 def comparison_agent(state: dict) -> dict:
@@ -31,12 +32,14 @@ def comparison_agent(state: dict) -> dict:
     query = state.get("query", "")
     paper_text = state.get("paper_text", "")
 
-    vector_store = PaperVectorStore()
+    vector_store = state.get("vector_store")
 
-    # 🔍 Semantic retrieval focused on comparison-relevant content
-    retrieved_chunks: List[Dict] = vector_store.query(
-        query="method approach results performance comparison baseline",
+    retrieved_chunks = []
+    if vector_store:
+        retrieved_chunks = vector_store.similarity_search(
+        query,
         top_k=3,
+        section_filter="experiments",
     )
 
     if not paper_text.strip():

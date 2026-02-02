@@ -1,4 +1,4 @@
-from typing import TypedDict, Dict, List
+from typing import TypedDict, Dict, List, Any
 
 from langgraph.graph import StateGraph, END
 
@@ -13,52 +13,37 @@ from agents.idea_generator_agent import idea_generator_agent
 # -----------------------------
 # Shared State
 # -----------------------------
-class ResearchState(TypedDict):
+class ResearchState(TypedDict, total=False):
+    # Core
     query: str
-    paper_path: str | None
-    paper_text: str
-    paper_sections: Dict[str, str]
     selected_agents: List[str]
     intermediate_results: Dict
     final_response: str
+
+    # Paper-related
+    paper_path: str
+    paper_text: str
+    paper_sections: Dict
+
+    # Vector DB
+    vector_store: Any
+
 
 # -----------------------------
 # Planner Node
 # -----------------------------
 def planner_node(state: ResearchState) -> ResearchState:
-    state["selected_agents"] = planner_agent(state["query"])
+    query = state["query"]
+    paper_present = bool(state.get("paper_path"))
+
+    state["selected_agents"] = planner_agent(
+        query=query,
+        paper_present=paper_present,
+    )
+
     return state
 
 
-# -----------------------------
-# Router
-# -----------------------------
-def router(state: ResearchState) -> str:
-    if not state["selected_agents"]:
-        return "final"
-
-    raw_agent = state["selected_agents"].pop(0)
-
-    if raw_agent not in PLANNER_TO_GRAPH_NODE:
-        raise ValueError(
-            f"Planner returned unknown agent '{raw_agent}'. "
-            f"Known agents: {list(PLANNER_TO_GRAPH_NODE.keys())}"
-        )
-
-    return PLANNER_TO_GRAPH_NODE[raw_agent]
-
-
-# -----------------------------
-# Final Aggregator
-# -----------------------------
-def final_node(state: ResearchState) -> ResearchState:
-    output = []
-
-    for agent, content in state["intermediate_results"].items():
-        output.append(f"[{agent.upper()}]\n{content}")
-
-    state["final_response"] = "\n\n".join(output)
-    return state
 # -----------------------------
 # Planner → Graph Node Mapping
 # -----------------------------
@@ -83,6 +68,44 @@ PLANNER_TO_GRAPH_NODE = {
     "final": "final",
 }
 
+
+# -----------------------------
+# Router
+# -----------------------------
+def router(state: ResearchState) -> str:
+    selected = state.get("selected_agents", [])
+
+    if not selected:
+        return "final"
+
+    raw_agent = selected.pop(0)
+
+    # Explicit write-back (defensive clarity)
+    state["selected_agents"] = selected
+
+    mapped = PLANNER_TO_GRAPH_NODE.get(raw_agent)
+    if not mapped:
+        raise ValueError(
+            f"Planner returned unknown agent '{raw_agent}'. "
+            f"Known agents: {sorted(PLANNER_TO_GRAPH_NODE.keys())}"
+        )
+
+    return mapped
+
+
+# -----------------------------
+# Final Aggregator
+# -----------------------------
+def final_node(state: ResearchState) -> ResearchState:
+    output = []
+
+    for agent, content in state.get("intermediate_results", {}).items():
+        output.append(f"[{agent.upper()}]\n{content}")
+
+    state["final_response"] = "\n\n".join(output)
+    return state
+
+
 # -----------------------------
 # Build Graph
 # -----------------------------
@@ -97,13 +120,11 @@ def build_graph():
     graph.add_node("critique", critique_agent)
     graph.add_node("idea_generator", idea_generator_agent)
     graph.add_node("final", final_node)
-    
-    
 
     # Entry
     graph.set_entry_point("planner")
 
-    # Planner routes once
+    # Planner routing
     graph.add_conditional_edges(
         "planner",
         router,
@@ -117,7 +138,7 @@ def build_graph():
         },
     )
 
-    # Agents route to next agent or final
+    # Agent chaining
     for agent in [
         "paper_reader",
         "math_explainer",
